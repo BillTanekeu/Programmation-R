@@ -1,0 +1,151 @@
+---
+title: "Tp data Mining en R groupe 8"
+output: html_notebook
+---
+## Importation des données Adult
+```{r}
+setwd("/home/bill/Documents/R")
+library(rpart)
+library(rpart.plot)
+library(ggcorrplot)
+library(factoextra)
+library(FactoMineR)
+df <- read.table("dataset/adult.csv",sep = ",",header = F,dec = ".")
+colnames(df) <- c("age", "classe_ouvrier","poids_final", "education",
+            "annee_etude", "etat_civil","occupation", "relation_amoureuse",
+            "course","sexe","gain","perte","heur_semaine","pays_origine","classe")
+
+```
+## Suppression valeurs manquantes
+```{r}
+# table de valeurs manquantes
+v_manquantes = which(df[] == "?",arr.ind=TRUE)
+
+# suppression 
+df <- df[-v_manquantes[,1],]
+
+```
+# histogrammes des données numériques du dataset
+
+```{r}
+hist(df$age)
+hist(df$heur_semaine)
+hist(df$poids_final)
+hist(df$annee_etude)
+hist(df$gain)
+hist(df$perte)
+
+```
+
+
+##séparation données apprentissage et test
+```{r}
+
+nb_ligne = floor(nrow(df)*0.80)
+df = df[sample(nrow(df)),]
+
+df.train = df[1:nb_ligne,]
+df.test = df[1+nb_ligne:nrow(df),]
+
+```
+## Construction de l'arbre de décision
+```{r}
+arbre = rpart(classe~., df.train,control = rpart.control(minsplit = 40, cp = 0.008))
+
+```
+## Affichage de l'arbre
+```{r}
+rpart.plot(arbre, uniform = T)
+
+```
+## courbe d'erreur l'or de l'apprentissage
+```{r}
+plotcp(arbre)
+```
+
+## Evaluation de l'arbre sur les données de test
+```{r}
+evalue = function(ad, df){
+    matrice = table(df$classe, predict(ad, df, type="class"))
+    success = sum(diag(matrice))/sum(matrice)
+    r=0 
+    n= nrow(matrice)
+    for (i in 1:n) {
+        r= matrice[i,i ]/sum(matrice[i,])
+        p = matrice[i,i]/sum(matrice[,i])}
+    
+    r= r/n
+    p= p/n
+    return(list("Matrice confusion"= matrice,'Taux success '= success, 'Rappel '= r, 'Précision '= p))
+}
+
+evalue(arbre,df.test)
+```
+## Classification non supervisée Kmeans
+
+#corrélation attributs numeriques
+```{r}
+
+
+suppression_donnees_categ = function(df){
+    n = 1
+    i =1
+    while (n <= ncol(df)) {
+        if(typeof(df[,i])!= "integer"){
+            df = df[,-i]
+            i = i-1
+            n= n-1
+        }
+        i=i+1
+        n= n+1
+    }
+    return(df)
+}
+df_k = suppression_donnees_categ(df)
+df_k_r = df_k[1:100,]
+
+corr = round(cor(df_k),2)
+cor_plot = ggcorrplot(corr, hc.order = T, type = "lower", lab =T,
+                      lab_size = 3, colors = c("red","white","green"),
+                      title = "Matrice de corrélation",
+                      ggtheme = theme_bw)
+cor_plot
+#df_K_sc <- scale(df_k_r,center=T,scale=T)
+#head(df_K_sc)
+```
+### Normalisation des données numeriques
+```{r}
+normalisation = function(df){
+    n = ncol(df)
+    for (i in 1:n){
+        if(typeof(df[,i])== "integer")
+            df[,i] = scale(df[,i])
+    }
+    return(df)
+}
+
+df_K_sc <- scale(df_k_r,center=T,scale=T)
+head(df_K_sc)
+```
+
+
+## Application Kmeans sur les données numeriques
+```{r}
+#nombre de clusters = 3
+res = kmeans( df_K_sc, centers = 3)
+
+```
+
+## Visualisation des clusters dans le plan
+```{r}
+fviz_cluster(res, df_K_sc, ellipse.type = "norm") 
+
+```
+## classification hierachique
+```{r}
+res_hcp =  HCPC(df_K_sc, nb.clust = 0, min = 3, max = NULL, graph = TRUE)
+
+
+```
+
+
